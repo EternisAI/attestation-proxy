@@ -1,0 +1,11 @@
+# vim swap files
+[._]*.s??
+# vim temporary files / common backups
+*~
+# MacOS extended attributes
+._*
+# MacOS Desktop Services Store
+.DS_Store
+
+# Build output
+/attestation-proxy
