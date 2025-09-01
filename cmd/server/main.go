@@ -33,10 +33,11 @@ var (
 	logLevel         string
 	privateKeyPath   string
 	certificatePath  string
+	envVars          string
 	logger           *logrus.Logger
 
-	// Global enclaveData variable
 	enclaveData EnclaveData
+	enclaveVars map[string]string
 )
 
 const ATTESTATION_ENDPOINT_PATH = "/-/attestation"
@@ -85,6 +86,24 @@ func LoadEnclaveData() EnclaveData {
 	return ed
 }
 
+// FetchEnvVars obtains environment variables that should be passed to the attestation document
+func FetchEnvVars() map[string]string {
+	vars := make(map[string]string)
+
+	if len(envVars) > 0 {
+		for part := range strings.SplitSeq(envVars, ",") {
+			key := strings.TrimSpace(part)
+			if len(key) > 0 {
+				if val, ok := os.LookupEnv(key); ok {
+					vars[key] = val
+				}
+			}
+		}
+	}
+
+	return vars
+}
+
 func init() {
 	// Initialize logger
 	logger = logrus.New()
@@ -111,6 +130,7 @@ func main() {
 	rootCmd.Flags().StringVarP(&logLevel, "log-level", "l", "info", "Log level (trace, debug, info, warn, error, fatal, panic)")
 	rootCmd.Flags().StringVarP(&privateKeyPath, "private-key", "k", "", "Path to private key file")
 	rootCmd.Flags().StringVarP(&certificatePath, "certificate", "c", "", "Path to certificate file")
+	rootCmd.Flags().StringVarP(&envVars, "env-vars", "e", "", "Comma-separated list of environment variables to pass to the attestation document")
 
 	if err := rootCmd.Execute(); err != nil {
 		logger.WithError(err).Fatal("Failed to execute command")
@@ -155,6 +175,9 @@ func runServer(cmd *cobra.Command, args []string) {
 
 	// Initialize enclave data from environment variables
 	enclaveData = LoadEnclaveData()
+
+	// Fetch environment variables to be passed to the attestation document
+	enclaveVars = FetchEnvVars()
 
 	// Setup file watchers if paths are specified
 	var privateKeyWatcher *fsnotify.Watcher
@@ -318,6 +341,11 @@ func getAttestationPayload(requestID, nonce string) ([]byte, string, error) {
 	// Add enclave data if not empty
 	if !enclaveData.empty() {
 		userData["enclave"] = enclaveData
+	}
+
+	// Add environment variables if not empty
+	if len(enclaveVars) > 0 {
+		userData["env"] = enclaveVars
 	}
 
 	// Add TLS data if we have public key or certificate fingerprints
