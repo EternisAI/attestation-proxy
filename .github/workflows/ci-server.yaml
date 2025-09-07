@@ -26,6 +26,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      packages: write
     steps:
     - name: Checkout
       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -35,7 +36,7 @@ jobs:
       uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
       with:
         images: |
-          public.ecr.aws/f5z1z8p0/attestation-proxy/server
+          ghcr.io/eternisai/attestation-proxy/server
         tags: |
           type=sha
           type=semver,pattern={{raw}}
@@ -54,16 +55,12 @@ jobs:
         echo "::add-mask::$OIDC_TOKEN"
         echo "token=$OIDC_TOKEN" >> $GITHUB_OUTPUT
 
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+    - name: Log in to GHCR
+      uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
       with:
-        aws-region: us-east-1
-        role-to-assume: arn:aws:iam::314146293458:role/github-ci-attestation-proxy
-
-    - name: Log in to AWS Public ECR
-      uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
-      with:
-        registry-type: public
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
@@ -83,6 +80,6 @@ jobs:
     - name: Cosign App Image
       run: >-
         cosign sign --yes --identity-token "$COSIGN_OIDC_TOKEN"
-        "public.ecr.aws/f5z1z8p0/attestation-proxy/server@${{ steps.build-image.outputs.digest }}"
+        "ghcr.io/eternisai/attestation-proxy/server@${{ steps.build-image.outputs.digest }}"
       env:
         COSIGN_OIDC_TOKEN: ${{ steps.cosign-token.outputs.token }}
